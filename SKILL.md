@@ -194,34 +194,57 @@ Build the cron expression from the user's preferences:
 - Daily at 8am → `"0 8 * * *"`
 - Weekly on Monday at 9am → `"0 9 * * 1"`
 
+**IMPORTANT: Do NOT use `--channel last`.** It fails when the user has multiple
+channels configured (e.g. telegram + feishu) because the isolated cron session
+has no "last" channel context. Always detect and specify the exact channel.
+
+**Step 1: Detect the current channel and target.**
+During onboarding, the user is talking to you through a specific channel.
+Detect it automatically:
+```bash
+# Check which channels are configured
+openclaw channels list 2>/dev/null || echo "Could not list channels"
+```
+
+Then ask the user: "I see you're messaging me via [channel name]. Should I
+deliver your daily digest here?" If yes, use that channel. If no, ask which
+channel they prefer.
+
+For each channel type, you need both `--channel` AND `--to`:
+- Telegram: `--channel telegram --to "<chat_id>"`
+- Discord: `--channel discord --to "<channel_id>"`
+- Slack: `--channel slack --to "channel:<channel_id>"`
+- Feishu: `--channel feishu --to "<open_id>"`
+- WhatsApp: `--channel whatsapp --to "<phone_number>"`
+
+To get the target ID, check the current session context or ask the user.
+For Feishu, the open_id looks like `ou_e67df1a850910efb902462aeb87783e5`.
+
+**Step 2: Create the cron job with explicit channel and target.**
 ```bash
 openclaw cron add \
   --name "AI Builders Digest" \
   --cron "<cron expression>" \
-  --tz "<user IANA timezone, e.g. America/Los_Angeles>" \
+  --tz "<user IANA timezone>" \
   --session isolated \
   --message "Run the follow-builders skill: execute prepare-digest.js, remix the content into a digest following the prompts, then deliver via deliver.js" \
   --announce \
-  --channel last \
+  --channel <detected channel> \
+  --to "<detected target ID>" \
   --exact
 ```
 
-Parameters explained:
-- `--session isolated`: runs in a fresh session so it doesn't pollute the main chat
-- `--announce`: delivers the result to the user's messaging channel
-- `--channel last`: sends to whichever channel the user last messaged from
-- `--exact`: no stagger delay, run at the exact scheduled time
-- `--tz`: IANA timezone string so the cron runs at the user's local time
-
-If the user wants it delivered to a specific channel instead of `last`:
-- Telegram: `--channel telegram --to "<chat_id>"`
-- Discord: `--channel discord --to "<channel_id>"`
-- Slack: `--channel slack --to "channel:<channel_id>"`
-
-To verify the job was created:
+**Step 3: Verify the cron job works by running it once immediately.**
 ```bash
 openclaw cron list
+openclaw cron run <jobId>
 ```
+
+Wait for the test run to complete and confirm the user received the digest
+in their channel. If it fails, check the error with `openclaw cron runs --id <jobId>`
+and fix the channel/target configuration before moving on.
+
+Do NOT proceed to the welcome digest step until the cron job has been verified.
 
 **Non-persistent agent + Telegram or Email delivery:**
 Use system crontab so it runs even when the terminal is closed:
