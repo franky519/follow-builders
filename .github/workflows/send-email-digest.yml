@@ -1,0 +1,83 @@
+name: Send Email Digest
+
+on:
+  schedule:
+    # Beijing time 08:00 = UTC 00:00
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: scripts
+        run: npm ci
+
+      - name: Prepare local config
+        env:
+          DIGEST_TO_EMAIL: ${{ vars.DIGEST_TO_EMAIL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          test -n "$DIGEST_TO_EMAIL"
+          test -n "$RESEND_API_KEY"
+
+          mkdir -p ~/.follow-builders
+
+          cat > ~/.follow-builders/config.json <<EOF
+          {
+            "platform": "other",
+            "language": "zh",
+            "timezone": "Asia/Shanghai",
+            "frequency": "daily",
+            "deliveryTime": "08:00",
+            "delivery": {
+              "method": "email",
+              "email": "${DIGEST_TO_EMAIL}"
+            },
+            "onboardingComplete": true
+          }
+          EOF
+
+          cat > ~/.follow-builders/.env <<EOF
+          RESEND_API_KEY=${RESEND_API_KEY}
+          EOF
+
+      - name: Prepare digest input
+        working-directory: scripts
+        run: node prepare-digest.js > /tmp/fb-input.json
+
+      - name: Remix digest with LLM
+        working-directory: scripts
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+          MAX_TWEETS_PER_BUILDER: ${{ vars.MAX_TWEETS_PER_BUILDER }}
+          PODCAST_TRANSCRIPT_MAX_CHARS: ${{ vars.PODCAST_TRANSCRIPT_MAX_CHARS }}
+          BLOG_CONTENT_MAX_CHARS: ${{ vars.BLOG_CONTENT_MAX_CHARS }}
+        run: node remix-digest.js < /tmp/fb-input.json > /tmp/fb-digest.txt
+
+      - name: Send email
+        working-directory: scripts
+        run: node deliver.js --file /tmp/fb-digest.txt
+
+      - name: Upload debug artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: follow-builders-digest-${{ github.run_number }}
+          if-no-files-found: ignore
+          path: |
+            /tmp/fb-input.json
+            /tmp/fb-digest.txt
