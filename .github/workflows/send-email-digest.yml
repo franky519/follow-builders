@@ -81,6 +81,8 @@ jobs:
 
       - name: Send email
         working-directory: scripts
+        env:
+          RESEND_FROM_EMAIL: ${{ vars.RESEND_FROM_EMAIL }}
         run: node deliver.js --file /tmp/fb-digest.txt
 
       - name: Upload debug artifacts
