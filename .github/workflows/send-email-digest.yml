@@ -57,6 +57,21 @@ jobs:
         working-directory: scripts
         run: node prepare-digest.js > /tmp/fb-input.json
 
+      - name: Validate LLM config
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+        run: |
+          test -n "$OPENAI_API_KEY"
+          test -n "$OPENAI_MODEL"
+          echo "OPENAI_MODEL=$OPENAI_MODEL"
+          if [ -n "$OPENAI_BASE_URL" ]; then
+            echo "OPENAI_BASE_URL=$OPENAI_BASE_URL"
+          else
+            echo "OPENAI_BASE_URL=<default https://api.openai.com/v1>"
+          fi
+
       - name: Remix digest with LLM
         working-directory: scripts
         env:

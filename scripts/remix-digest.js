@@ -166,12 +166,32 @@ async function requestDigest(messages) {
     })
   });
 
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+  const rawBody = await res.text();
+
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`LLM API error: ${res.status} ${err}`);
+    throw new Error(`LLM API error: ${res.status} ${rawBody}`);
   }
 
-  const data = await res.json();
+  if (!contentType.includes('application/json')) {
+    const preview = rawBody.slice(0, 240);
+    throw new Error(
+      `LLM API returned non-JSON response (content-type: ${contentType || 'unknown'}). ` +
+      `Check OPENAI_BASE_URL / gateway config. Response starts with: ${preview}`
+    );
+  }
+
+  let data;
+  try {
+    data = JSON.parse(rawBody);
+  } catch (err) {
+    const preview = rawBody.slice(0, 240);
+    throw new Error(
+      `LLM API returned invalid JSON. Check OPENAI_BASE_URL / gateway config. ` +
+      `Response starts with: ${preview}`
+    );
+  }
+
   const output = data?.choices?.[0]?.message?.content?.trim();
   if (!output) {
     throw new Error('LLM returned empty content');
