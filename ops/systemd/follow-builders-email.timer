@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Follow Builders local email digest every morning
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+Unit=follow-builders-email.service
+
+[Install]
+WantedBy=timers.target

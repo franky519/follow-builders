@@ -1,0 +1,9 @@
+[Unit]
+Description=Follow Builders local email digest via Codex
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/fnckc/AI_workspace/coding/projects/general_chat/2026-04-06_20-24_follow-builders_github-actions_email
+ExecStart=/bin/bash /home/fnckc/AI_workspace/coding/projects/general_chat/2026-04-06_20-24_follow-builders_github-actions_email/scripts/run-local-email-with-codex.sh
